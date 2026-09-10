@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Space Shooter - Game Bắn Súng 2D</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        body {
+            background: #050515;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-wrapper {
+            position: relative;
+            box-shadow: 0 0 40px rgba(0, 243, 255, 0.4);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #00f3ff;
+            background: #000;
+        }
+        canvas {
+            display: block;
+            background: radial-gradient(circle at center, #0a0a23 0%, #020208 100%);
+        }
+        .ui-hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
+        }
+        .hud-card {
+            background: rgba(10, 10, 35, 0.75);
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 243, 255, 0.4);
+            backdrop-filter: blur(6px);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .hud-card span {
+            color: #00f3ff;
+        }
+        #screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 2, 10, 0.88);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            backdrop-filter: blur(8px);
+            padding: 20px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 42px;
+            background: linear-gradient(45deg, #00f3ff, #ff0055);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            text-shadow: 0 0 30px rgba(0, 243, 255, 0.5);
+            letter-spacing: 2px;
+        }
+        p {
+            font-size: 16px;
+            color: #94a3b8;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+        .btn {
+            background: linear-gradient(135deg, #00f3ff, #0066ff);
+            color: #000;
+            border: none;
+            padding: 14px 36px;
+            font-size: 18px;
+            font-weight: 800;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.8);
+            background: linear-gradient(135deg, #33f6ff, #3388ff);
+        }
+        .controls-info {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+        }
+        .controls-info kbd {
+            background: #1e293b;
+            color: #38bdf8;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #334155;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <div class="ui-hud">
+            <div class="hud-card">ĐIỂM: <span id="score-val">0</span></div>
+            <div class="hud-card">MẠNG: <span id="lives-val">❤️❤️❤️</span></div>
+            <div class="hud-card">VŨ KHÍ: <span id="weapon-val">TIÊU CHUẨN</span></div>
+        </div>
+
+        <div id="screen-overlay">
+            <h1 id="title-text">CYBER STRIKE 2D</h1>
+            <p id="desc-text">Tiêu diệt phi thuyền địch, thu thập vật phẩm nâng cấp vũ khí!<br>Tránh va chạm và sống sót qua các đợt tấn công.</p>
+            <button class="btn" id="action-btn" onclick="initGame()">BẮT ĐẦU CHIẾN ĐẤU</button>
+        </div>
+
+        <canvas id="gameCanvas" width="500" height="700"></canvas>
+    </div>
+
+    <div class="controls-info">
+        🎮 Điều khiển: Dùng <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> hoặc <kbd>Phím Mũi Tên</kbd> để di chuyển. Tự động bắn!
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const scoreVal = document.getElementById('score-val');
+        const livesVal = document.getElementById('lives-val');
+        const weaponVal = document.getElementById('weapon-val');
+        const screenOverlay = document.getElementById('screen-overlay');
+        const titleText = document.getElementById('title-text');
+        const descText = document.getElementById('desc-text');
+        const actionBtn = document.getElementById('action-btn');
+
+        let isPlaying = false;
+        let score = 0;
+        let lives = 3;
+        let animationId = null;
+        let lastTime = 0;
+
+        // Controls
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+
+        window.addEventListener('keydown', e => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+        window.addEventListener('keyup', e => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+        // Game Objects
+        let player = {
+            x: canvas.width / 2,
+            y: canvas.height - 80,
+            radius: 18,
+            speed: 5.5,
+            weaponLevel: 1,
+            lastShot: 0,
+            shotInterval: 140
+        };
+
+        let bullets = [];
+        let enemies = [];
+        let particles = [];
+        let stars = [];
+        let powerups = [];
+        let enemyBullets = [];
+
+        // Init Background Stars
+        for (let i = 0; i < 80; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2 + 0.5,
+                speed: Math.random() * 2 + 0.5
+            });
+        }
+
+        function initGame() {
+            score = 0;
+            lives = 3;
+            player.weaponLevel = 1;
+            player.x = canvas.width / 2;
+            player.y = canvas.height - 80;
+            bullets = [];
+            enemies = [];
+            particles = [];
+            powerups = [];
+            enemyBullets = [];
+
+            scoreVal.textContent = score;
+            updateLivesDisplay();
+            updateWeaponDisplay();
+
+            screenOverlay.style.display = 'none';
+            isPlaying = true;
+            lastTime = performance.now();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function updateLivesDisplay() {
+            livesVal.textContent = '❤️'.repeat(Math.max(0, lives));
+        }
+
+        function updateWeaponDisplay() {
+            const names = ['TIÊU CHUẨN', 'LASER KÉP', 'HỎA LỰC BA'];
+            weaponVal.textContent = names[player.weaponLevel - 1] || 'TỐI ĐA';
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            cancelAnimationFrame(animationId);
+            titleText.textContent = 'GAME OVER';
+            titleText.style.background = 'linear-gradient(45deg, #ff0055, #ffaa00)';
+            titleText.style.webkitBackgroundClip = 'text';
+            descText.innerHTML = `Bạn đã hy sinh trong không gian!<br>Tổng điểm đạt được: <strong style="color: #00f3ff; font-size: 20px;">${score}</strong>`;
+            actionBtn.textContent = 'CHƠI LẠI';
+            screenOverlay.style.display = 'flex';
+        }
+
+        function createExplosion(x, y, color, count = 20) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 1;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: Math.random() * 3 + 1,
+                    color,
+                    alpha: 1,
+                    decay: Math.random() * 0.03 + 0.01
+                });
+            }
+        }
+
+        let enemySpawnTimer = 0;
+
+        function gameLoop(timestamp) {
+            if (!isPlaying) return;
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // --- 1. UPDATE ---
+
+            // Stars
+            stars.forEach(star => {
+                star.y += star.speed;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+            });
+
+            // Player Movement
+            let dx = 0, dy = 0;
+            if (keys.a || keys.ArrowLeft) dx -= 1;
+            if (keys.d || keys.ArrowRight) dx += 1;
+            if (keys.w || keys.ArrowUp) dy -= 1;
+            if (keys.s || keys.ArrowDown) dy += 1;
+
+            if (dx !== 0 && dy !== 0) {
+                dx *= 0.7071;
+                dy *= 0.7071;
+            }
+
+            player.x += dx * player.speed;
+            player.y += dy * player.speed;
+
+            // Boundaries
+            player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
+
+            // Auto Shoot
+            if (timestamp - player.lastShot > player.shotInterval) {
+                if (player.weaponLevel === 1) {
+                    bullets.push({ x: player.x, y: player.y - player.radius, speed: 10, radius: 4, color: '#00f3ff' });
+                } else if (player.weaponLevel === 2) {
+                    bullets.push({ x: player.x - 8, y: player.y - player.radius, speed: 10, radius: 4, color: '#00ff66' });
+                    bullets.push({ x: player.x + 8, y: player.y - player.radius, speed: 10, radius: 4, color: '#00ff66' });
+                } else {
+                    bullets.push({ x: player.x, y: player.y - player.radius, speed: 11, radius: 5, color: '#ff0055' });
+                    bullets.push({ x: player.x - 12, y: player.y - player.radius + 5, speed: 10, radius: 4, color: '#ffcc00', vx: -1 });
+                    bullets.push({ x: player.x + 12, y: player.y - player.radius + 5, speed: 10, radius: 4, color: '#ffcc00', vx: 1 });
+                }
+                player.lastShot = timestamp;
+            }
+
+            // Update Bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i];
+                b.y -= b.speed;
+                if (b.vx) b.x += b.vx;
+                if (b.y < -10) bullets.splice(i, 1);
+            }
+
+            // Update Enemy Bullets
+            for (let i = enemyBullets.length - 1; i >= 0; i--) {
+                let eb = enemyBullets[i];
+                eb.x += eb.vx || 0;
+                eb.y += eb.speed;
+                if (eb.y > canvas.height + 10) {
+                    enemyBullets.splice(i, 1);
+                    continue;
+                }
+                let dist = Math.hypot(eb.x - player.x, eb.y - player.y);
+                if (dist < player.radius + eb.radius) {
+                    enemyBullets.splice(i, 1);
+                    lives--;
+                    updateLivesDisplay();
+                    createExplosion(player.x, player.y, '#ff0055', 15);
+                    if (lives <= 0) {
+                        gameOver();
+                        return;
+                    }
+                }
+            }
+
+            // Spawn Enemies
+            enemySpawnTimer += dt;
+            let spawnInterval = Math.max(400, 1100 - score * 8);
+            if (enemySpawnTimer > spawnInterval) {
+                let typeRand = Math.random();
+                let type = 'normal';
+                let size = 20;
+                let hp = 1;
+                let color = '#ff3366';
+
+                if (score > 150 && typeRand < 0.3) {
+                    type = 'shooter';
+                    size = 24;
+                    hp = 2;
+                    color = '#aa00ff';
+                } else if (score > 300 && typeRand < 0.15) {
+                    type = 'boss';
+                    size = 38;
+                    hp = 6;
+                    color = '#ffaa00';
+                }
+
+                enemies.push({
+                    x: Math.random() * (canvas.width - size * 2) + size,
+                    y: -size,
+                    size,
+                    hp,
+                    maxHp: hp,
+                    type,
+                    color,
+                    speed: type === 'boss' ? 1.2 : (type === 'shooter' ? 2 : Math.random() * 2 + 2),
+                    lastShot: 0
+                });
+                enemySpawnTimer = 0;
+            }
+
+            // Update Enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let en = enemies[i];
+                en.y += en.speed;
+
+                if (en.type === 'shooter' && timestamp - en.lastShot > 1500) {
+                    enemyBullets.push({ x: en.x, y: en.y + en.size, speed: 4, radius: 4 });
+                    en.lastShot = timestamp;
+                } else if (en.type === 'boss' && timestamp - en.lastShot > 1000) {
+                    enemyBullets.push({ x: en.x - 12, y: en.y + en.size, speed: 5, radius: 5, vx: -0.5 });
+                    enemyBullets.push({ x: en.x + 12, y: en.y + en.size, speed: 5, radius: 5, vx: 0.5 });
+                    en.lastShot = timestamp;
+                }
+
+                let distToPlayer = Math.hypot(en.x - player.x, en.y - player.y);
+                if (distToPlayer < en.size + player.radius - 5) {
+                    createExplosion(en.x, en.y, en.color, 25);
+                    enemies.splice(i, 1);
+                    lives--;
+                    updateLivesDisplay();
+                    if (lives <= 0) {
+                        gameOver();
+                        return;
+                    }
+                    continue;
+                }
+
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    let b = bullets[j];
+                    let dist = Math.hypot(en.x - b.x, en.y - b.y);
+                    if (dist < en.size + b.radius) {
+                        bullets.splice(j, 1);
+                        en.hp--;
+                        if (en.hp <= 0) {
+                            createExplosion(en.x, en.y, en.color, 20);
+                            score += en.type === 'boss' ? 50 : (en.type === 'shooter' ? 20 : 10);
+                            scoreVal.textContent = score;
+
+                            if (Math.random() < 0.22) {
+                                powerups.push({ x: en.x, y: en.y, radius: 12, type: Math.random() < 0.6 ? 'weapon' : 'heal' });
+                            }
+
+                            enemies.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+
+                if (en && en.y > canvas.height + en.size) {
+                    enemies.splice(i, 1);
+                }
+            }
+
+            // Update Powerups
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                let p = powerups[i];
+                p.y += 2;
+                if (p.y > canvas.height + 20) {
+                    powerups.splice(i, 1);
+                    continue;
+                }
+                let dist = Math.hypot(p.x - player.x, p.y - player.y);
+                if (dist < player.radius + p.radius) {
+                    if (p.type === 'weapon') {
+                        if (player.weaponLevel < 3) player.weaponLevel++;
+                        updateWeaponDisplay();
+                    } else {
+                        if (lives < 5) lives++;
+                        updateLivesDisplay();
+                    }
+                    createExplosion(p.x, p.y, p.type === 'weapon' ? '#00ff66' : '#ff0055', 10);
+                    powerups.splice(i, 1);
+                }
+            }
+
+            // Update Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let pt = particles[i];
+                pt.x += pt.vx;
+                pt.y += pt.vy;
+                pt.alpha -= pt.decay;
+                if (pt.alpha <= 0) particles.splice(i, 1);
+            }
+
+            // --- 2. RENDER ---
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Stars
+            ctx.fillStyle = '#ffffff';
+            stars.forEach(star => {
+                ctx.globalAlpha = Math.random() * 0.6 + 0.2;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            // Draw Powerups
+            powerups.forEach(p => {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.fillStyle = p.type === 'weapon' ? '#00ff66' : '#ff0055';
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(p.type === 'weapon' ? 'W' : '+', 0, 0);
+                ctx.restore();
+            });
+
+            // Draw Bullets
+            bullets.forEach(b => {
+                ctx.save();
+                ctx.fillStyle = b.color;
+                ctx.shadowColor = b.color;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Draw Enemy Bullets
+            enemyBullets.forEach(eb => {
+                ctx.save();
+                ctx.fillStyle = '#ff3300';
+                ctx.shadowColor = '#ff3300';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(eb.x, eb.y, eb.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Draw Enemies
+            enemies.forEach(en => {
+                ctx.save();
+                ctx.translate(en.x, en.y);
+                ctx.fillStyle = en.color;
+                ctx.shadowColor = en.color;
+                ctx.shadowBlur = 12;
+
+                ctx.beginPath();
+                if (en.type === 'boss') {
+                    ctx.moveTo(0, en.size);
+                    ctx.lineTo(-en.size, -en.size / 2);
+                    ctx.lineTo(0, -en.size);
+                    ctx.lineTo(en.size, -en.size / 2);
+                } else if (en.type === 'shooter') {
+                    ctx.moveTo(0, en.size);
+                    ctx.lineTo(-en.size, -en.size);
+                    ctx.lineTo(en.size, -en.size);
+                } else {
+                    ctx.arc(0, 0, en.size, 0, Math.PI * 2);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                if (en.hp > 1) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                    ctx.fillRect(-15, -en.size - 12, 30, 5);
+                    ctx.fillStyle = '#00ff66';
+                    ctx.fillRect(-15, -en.size - 12, (30 * (en.hp / en.maxHp)), 5);
+                }
+
+                ctx.restore();
+            });
+
+            // Draw Player Ship
+            ctx.save();
+            ctx.translate(player.x, player.y);
+
+            ctx.fillStyle = Math.random() > 0.5 ? '#00f3ff' : '#0066ff';
+            ctx.shadowColor = '#00f3ff';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.moveTo(-6, player.radius);
+            ctx.lineTo(0, player.radius + Math.random() * 14 + 6);
+            ctx.lineTo(6, player.radius);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#00f3ff';
+            ctx.beginPath();
+            ctx.moveTo(0, -player.radius - 4);
+            ctx.lineTo(player.radius + 2, player.radius);
+            ctx.lineTo(0, player.radius - 6);
+            ctx.lineTo(-player.radius - 2, player.radius);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, -2, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+
+            // Draw Particles
+            particles.forEach(pt => {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, pt.alpha);
+                ctx.fillStyle = pt.color;
+                ctx.shadowColor = pt.color;
+                ctx.shadowBlur = 6;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            animationId = requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
