@@ -1,6 +1,6 @@
 # Dự án Web Game Bắn Súng 2D: Vệ Bính Không Gian
 
-Chào bạn! Tôi đã xây dựng thành công một dự án game web bắn súng 2D hoàn chỉnh, hiện đại và sẵn sàng để chơi ngay trên trình duyệt.
+Chào bạn! Tôi đã xây dựng thành công một dự án game web bắn súng 2D hoàn chỉnh, hiện đại và sẵn sàng để chơi ngay trên trình duyệt.(link  https://minhvudz404.github.io/Ve-Binh-khong-gian/)
 
 ## 🚀 Tính năng nổi bật của game:
 1. **Đồ họa Neon & Hiệu ứng Không Gian**:
